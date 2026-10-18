@@ -1,5 +1,6 @@
 .env
-promptguard.db
-__pycache__/
-*.py[cod]venv/
 venv/
+.venv/
+__pycache__/
+*.pyc
+*.db
