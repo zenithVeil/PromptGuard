@@ -2,4 +2,5 @@ fastapi
 uvicorn
 httpx
 python-dotenv
-groq
+openai
+groq  # optional dev fallback; only required when NEBIUS_API_KEY is unset
