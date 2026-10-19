@@ -1,0 +1,14 @@
+node_modules/
+venv/
+.venv/
+__pycache__/
+.git/
+dist/
+build/
+*.log
+*.lock
+*.db
+.env
+.env.*
+data/
+datasets/

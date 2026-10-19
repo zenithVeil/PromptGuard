@@ -25,6 +25,11 @@ NEBIUS_BASE_URL = "https://api.tokenfactory.nebius.com/v1/"
 # Keywords used by RULES_ONLY mode to flag likely injection attempts.
 RULE_KEYWORDS = ("ignore previous", "system prompt", "exfiltrate")
 
+
+class LLMError(Exception):
+    """Raised when the LLM provider fails or returns unusable output."""
+
+
 _PROVIDER_ANNOUNCED = False
 
 
@@ -54,6 +59,15 @@ def _announce_provider() -> None:
 
 
 _announce_provider()
+
+
+def provider_mode() -> str:
+    """Return the active provider: ``nebius``, ``groq``, or ``rules-only``."""
+    if os.getenv("NEBIUS_API_KEY", "").strip():
+        return "nebius"
+    if os.getenv("GROQ_API_KEY", "").strip():
+        return "groq"
+    return "rules-only"
 
 
 def _strip_think(text: str) -> str:

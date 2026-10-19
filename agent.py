@@ -96,6 +96,7 @@ def main() -> None:
             "provider": decision.get("_provider", ""),
             "model": decision.get("_model", ""),
             "latency_s": decision.get("_latency_s", 0.0),
+            "user_task": page,
         }
         print(
             f"      Proposed tool={request['tool']} target={request['target']} "
