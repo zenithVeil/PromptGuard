@@ -3,4 +3,5 @@ uvicorn
 httpx
 python-dotenv
 openai
+pyyaml
 groq  # optional dev fallback; only required when NEBIUS_API_KEY is unset

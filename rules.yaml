@@ -1,0 +1,100 @@
+# PromptGuard Layer 1 rules (editable without touching code).
+# Each rule: id, severity (low|medium|high), description, and a regex pattern.
+# Any high-severity hit blocks immediately with no LLM call.
+
+rules:
+  # ---- Injection phrases / role overrides ----
+  - id: INJ-001
+    severity: high
+    description: Attempt to ignore previous instructions
+    pattern: "ignore\\s+(?:all\\s+)?previous\\s+(instructions|rules|guardrails|system|everything)"
+
+  - id: INJ-002
+    severity: high
+    description: Role override attempt ("you are now ...")
+    pattern: "you\\s+are\\s+now\\s+(a|an|the|an?)\\s+"
+
+  - id: INJ-003
+    severity: high
+    description: Developer mode / jailbreak request
+    pattern: "developer\\s+mode|jailbreak|dan\\s+mode|ignore\\s+your\\s+(training|safety|guidelines)"
+
+  - id: INJ-004
+    severity: high
+    description: System prompt / developer instruction extraction attempt
+    pattern: "system\\s+prompt|developer\\s+instruction|reveal\\s+(the\\s+)?system|show\\s+(the\\s+)?system\\s+instructions|print\\s+(the\\s+)?system"
+
+  - id: INJ-005
+    severity: medium
+    description: Disregard instruction attempt
+    pattern: "disregard\\s+(the|above|previous|all|prior)"
+
+  - id: INJ-006
+    severity: medium
+    description: Forget everything attempt
+    pattern: "forget\\s+(everything|all|what|you|prior|previous)"
+
+  # ---- Hidden text ----
+  - id: HID-001
+    severity: high
+    description: Zero-width Unicode characters (hidden text)
+    pattern: "[\\u200b\\u200c\\u200d\\ufeff]"
+
+  - id: HID-002
+    severity: medium
+    description: HTML comment block (possible hidden text)
+    pattern: "<!--[\\s\\S]*?-->"
+
+  - id: HID-003
+    severity: medium
+    description: CSS-hidden text (display:none / visibility:hidden)
+    pattern: "display\\s*:\\s*none|visibility\\s*:\\s*hidden"
+
+  # ---- Encoded blobs ----
+  - id: ENC-001
+    severity: medium
+    description: Base64-looking blob
+    pattern: "[A-Za-z0-9+/]{40,}={0,2}"
+
+  # ---- Secrets ----
+  - id: SEC-001
+    severity: high
+    description: API key-like string
+    pattern: "(sk|pk|api|secret|token|access)[_-][A-Za-z0-9]{20,}"
+
+  - id: SEC-002
+    severity: high
+    description: Private key header
+    pattern: "-----BEGIN\\s+(RSA\\s+)?PRIVATE\\s+KEY-----"
+
+  - id: SEC-003
+    severity: high
+    description: AWS access key ID
+    pattern: "AKIA[0-9A-Z]{16}"
+
+  # ---- URLs / emails outside allowlist (checked against allowlists in code) ----
+  - id: URL-001
+    severity: medium
+    description: URL outside allowlist
+    pattern: "https?://[^\\s<>\"'\\)\\]]+"
+
+  - id: EML-001
+    severity: medium
+    description: Email address outside allowlist
+    pattern: "[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}"
+
+sensitive_tools:
+  - send_email
+  - http_post
+  - shell
+  - file_read
+  - file_write
+  - payment
+
+url_allowlist:
+  - example.com
+  - localhost
+  - 127.0.0.1
+
+email_allowlist:
+  - example.com
