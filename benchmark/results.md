@@ -1,9 +1,9 @@
 # PromptGuard benchmark results
 
 - **Mode:** rules
-- **Date:** 2026-10-21T15:00:08.529681+00:00
-- **Database:** C:\Users\ASWATH~1.S\AppData\Local\Temp\promptguard_bench_mwfgr9vi\promptguard.db (temporary, not promptguard.db)
-- **LLM calls:** 8 / 150
+- **Date:** 2026-10-21T15:46:16.216953+00:00
+- **Database:** C:\Users\ASWATH~1.S\AppData\Local\Temp\promptguard_bench_jyyv72cp\promptguard.db (temporary, not promptguard.db)
+- **LLM calls:** 0 / 150
 - **Skipped (budget):** 0
 - **Failed:** 0
 
@@ -36,4 +36,4 @@
 
 | Median | p95 |
 |---|---|
-| 5.9 | 7.8 |
+| 7.7 | 16.0 |

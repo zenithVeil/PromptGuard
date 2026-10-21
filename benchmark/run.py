@@ -41,6 +41,12 @@ parser.add_argument(
     help="Maximum LLM calls in full mode (default: 150). Stops calling "
     "models after this many calls and reports skipped samples.",
 )
+parser.add_argument(
+    "--show-failures",
+    action="store_true",
+    help="Print every missed attack, false positive, and wrong tool-call "
+    "decision with details.",
+)
 args = parser.parse_args()
 
 # ---------------------------------------------------------------------------
@@ -90,8 +96,11 @@ _llm_calls = [0]
 
 
 def _counting_ask_json(model, system, user, max_tokens=800):
-    _llm_calls[0] += 1
-    return _original_ask_json(model, system, user, max_tokens=max_tokens)
+    result = _original_ask_json(model, system, user, max_tokens=max_tokens)
+    # Only count real model calls (Nebius / Groq), not RULES_ONLY.
+    if result.get("_provider") in ("nebius", "groq"):
+        _llm_calls[0] += 1
+    return result
 
 
 gateway.ask_json = _counting_ask_json
@@ -198,6 +207,29 @@ def _p95(values: list[float]) -> float:
     d = k - f
     return float(s[f] + d * (s[c] - s[f]))
 
+
+def _rule_ids_for_block(block_id: str) -> list[str]:
+    """Look up rule_ids for a block from the /events endpoint."""
+    if not block_id:
+        return []
+    try:
+        resp = client.get("/events")
+        if resp.status_code >= 400:
+            return []
+        for event in resp.json():
+            if event.get("block_id") == block_id:
+                raw = event.get("rule_ids", "")
+                if isinstance(raw, str):
+                    try:
+                        return json.loads(raw) if raw else []
+                    except Exception:
+                        return []
+                return raw if isinstance(raw, list) else []
+    except Exception:  # noqa: BLE001
+        pass
+    return []
+
+
 # ---------------------------------------------------------------------------
 # 6. Load benchmark data
 # ---------------------------------------------------------------------------
@@ -232,10 +264,13 @@ for sample in attacks:
             continue
         latencies.append(result["latency_ms"])
         flagged = bool(result["data"].get("flagged", False))
+        block_id = result["data"].get("block_id", "")
         attack_results.append(
             {
                 "id": sample_id,
                 "category": category,
+                "text": text,
+                "block_id": block_id,
                 "blocked": flagged,
                 "reason": result["data"].get("reason", ""),
             }
@@ -266,10 +301,13 @@ for sample in benign:
             continue
         latencies.append(result["latency_ms"])
         flagged = bool(result["data"].get("flagged", False))
+        block_id = result["data"].get("block_id", "")
         benign_results.append(
             {
                 "id": sample_id,
                 "category": category,
+                "text": text,
+                "block_id": block_id,
                 "false_positive": flagged,
                 "reason": result["data"].get("reason", ""),
             }
@@ -336,6 +374,7 @@ for sample in tool_calls:
             {
                 "id": sample_id,
                 "tool": tool,
+                "args": tool_args,
                 "expected": expected,
                 "allowed": allowed,
                 "correct": correct,
@@ -372,6 +411,61 @@ tool_accuracy = (correct_tools / total_tools * 100) if total_tools else 0.0
 
 median_latency = statistics.median(latencies) if latencies else 0.0
 p95_latency = _p95(latencies) if latencies else 0.0
+
+# ---------------------------------------------------------------------------
+# 10a. Show failures (optional)
+# ---------------------------------------------------------------------------
+if args.show_failures:
+    print()
+    print("=" * 60)
+    print("FAILURES")
+    print("=" * 60)
+
+    missed_attacks = [r for r in attack_results if not r["blocked"]]
+    false_positives_list = [r for r in benign_results if r["false_positive"]]
+    wrong_tools = [r for r in tool_results if not r["correct"]]
+
+    if missed_attacks:
+        print()
+        print(f"Missed attacks ({len(missed_attacks)}):")
+        for r in missed_attacks:
+            rule_ids = _rule_ids_for_block(r["block_id"])
+            text_preview = r["text"][:120].replace("\n", "\\n")
+            rid_str = ",".join(rule_ids) if rule_ids else "(none)"
+            print(
+                f"  id={r['id']} category={r['category']} "
+                f"text=\"{text_preview}\" "
+                f"rule_ids=[{rid_str}] reason=\"{r['reason']}\""
+            )
+
+    if false_positives_list:
+        print()
+        print(f"False positives ({len(false_positives_list)}):")
+        for r in false_positives_list:
+            rule_ids = _rule_ids_for_block(r["block_id"])
+            text_preview = r["text"][:120].replace("\n", "\\n")
+            rid_str = ",".join(rule_ids) if rule_ids else "(none)"
+            print(
+                f"  id={r['id']} category={r['category']} "
+                f"text=\"{text_preview}\" "
+                f"rule_ids=[{rid_str}] reason=\"{r['reason']}\""
+            )
+
+    if wrong_tools:
+        print()
+        print(f"Wrong tool-call decisions ({len(wrong_tools)}):")
+        for r in wrong_tools:
+            args_preview = str(r["args"])[:120].replace("\n", "\\n")
+            print(
+                f"  id={r['id']} tool={r['tool']} args=\"{args_preview}\" "
+                f"expected={r['expected']} allowed={r['allowed']} "
+                f"reason=\"{r['reason']}\""
+            )
+
+    total_failures = len(missed_attacks) + len(false_positives_list) + len(wrong_tools)
+    print()
+    print(f"Total failures: {total_failures}")
+    print("=" * 60)
 
 # ---------------------------------------------------------------------------
 # 11. Print table
